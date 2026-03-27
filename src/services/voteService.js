@@ -73,31 +73,37 @@ function getAllOpenVoteMessages() {
 
 /**
  * Award points to winners after a vote closes.
- * Winners = all participants on the winning side.
+ * Winners = all participants on the winning side (neutrals count as winners too).
+ * On a draw, everyone gets a draw tick. On no_votes, nothing happens.
  */
 function awardWinnerPoints(debate, winnerSide) {
-  if (winnerSide === 'no_votes' || winnerSide === 'draw') return;
+  if (winnerSide === 'no_votes') return;
 
-  const sideLabel = winnerSide === 'side_a' ? 'for' : 'against';
-  const winners = db.prepare(`
-    SELECT user_id FROM participants WHERE debate_id = ? AND (side = ? OR side = 'neutral')
-  `).all(debate.id, sideLabel);
+  const allParticipants = db.prepare('SELECT user_id, side FROM participants WHERE debate_id = ?').all(debate.id);
 
-  for (const winner of winners) {
-    ensureUser(debate.guild_id, winner.user_id);
-    db.prepare('UPDATE users SET points = points + ?, wins = wins + 1 WHERE guild_id = ? AND user_id = ?')
-      .run(POINTS.WIN_DEBATE, debate.guild_id, winner.user_id);
+  if (winnerSide === 'draw') {
+    // Everyone gets a draw
+    for (const p of allParticipants) {
+      ensureUser(debate.guild_id, p.user_id);
+      db.prepare('UPDATE users SET draws = draws + 1 WHERE guild_id = ? AND user_id = ?')
+        .run(debate.guild_id, p.user_id);
+    }
+    auditLog(debate.guild_id, 'debate_winner_awarded', null, null, `Debate #${debate.id} — draw`);
+    return;
   }
 
-  // Award losses to other side
-  const loserSideLabel = sideLabel === 'for' ? 'against' : 'for';
-  const losers = db.prepare(`
-    SELECT user_id FROM participants WHERE debate_id = ? AND side = ?
-  `).all(debate.id, loserSideLabel);
+  const winningSide = winnerSide === 'side_a' ? 'for' : 'against';
+  const losingSide = winningSide === 'for' ? 'against' : 'for';
 
-  for (const loser of losers) {
-    db.prepare('UPDATE users SET losses = losses + 1 WHERE guild_id = ? AND user_id = ?')
-      .run(debate.guild_id, loser.user_id);
+  for (const p of allParticipants) {
+    ensureUser(debate.guild_id, p.user_id);
+    if (p.side === winningSide || p.side === 'neutral') {
+      db.prepare('UPDATE users SET points = points + ?, wins = wins + 1 WHERE guild_id = ? AND user_id = ?')
+        .run(POINTS.WIN_DEBATE, debate.guild_id, p.user_id);
+    } else if (p.side === losingSide) {
+      db.prepare('UPDATE users SET losses = losses + 1 WHERE guild_id = ? AND user_id = ?')
+        .run(debate.guild_id, p.user_id);
+    }
   }
 
   auditLog(debate.guild_id, 'debate_winner_awarded', null, null, `Debate #${debate.id} — winner: ${winnerSide}`);

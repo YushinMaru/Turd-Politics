@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getDebate, openVoting, archiveDebate, deleteDebate, flagDebate } = require('../../services/debateService');
-const { saveVoteMessage } = require('../../services/voteService');
+const { saveVoteMessage, notifySubscribers } = require('../../services/voteService');
 const { scheduleVoteClose } = require('../../services/schedulerService');
 const { isMod, requireServerConfig } = require('../../utils/permissions');
 const { errorEmbed, successEmbed, votePollEmbed, flagEmbed } = require('../../utils/embeds');
@@ -86,6 +86,13 @@ module.exports = {
           await thread.send(`🗳️ **Voting is now open!** Head to <#${resultsChannel.id}> to cast your vote. Voting closes <t:${voteClosesAt}:R>.`);
         } catch {}
       }
+
+      // DM all subscribers that voting has opened
+      notifySubscribers(
+        interaction.client,
+        debateId,
+        `🗳️ Voting is now open for Debate #${debateId}: **"${updated.topic}"**! Closes <t:${voteClosesAt}:R>. Head to the server to vote!`,
+      ).catch(() => {});
 
       return interaction.editReply({ embeds: [successEmbed('Voting Opened!', `Voting for Debate #${debateId} is now live in <#${resultsChannel.id}>.`)] });
     }

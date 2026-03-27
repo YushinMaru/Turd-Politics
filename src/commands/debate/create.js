@@ -1,8 +1,9 @@
-const { SlashCommandBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { db } = require('../../db/db');
 const { createDebate, setDebateThread } = require('../../services/debateService');
 const { isDebateBanned, requireServerConfig } = require('../../utils/permissions');
 const { errorEmbed, debateAnnouncementEmbed } = require('../../utils/embeds');
+const { researchTopic } = require('../../services/researchService');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -64,6 +65,7 @@ module.exports = {
         });
         setDebateThread(debate.id, thread.id, thread.id);
         announceMessage = await interaction.editReply({ embeds: [embed], components: [row] });
+        postResearch(thread, topic).catch(() => {});
       } else {
         // Regular text channel: post announcement, then create a thread from it
         announceMessage = await debatesChannel.send({ embeds: [embed], components: [row] });
@@ -73,6 +75,7 @@ module.exports = {
         });
         setDebateThread(debate.id, thread.id, announceMessage.id);
         await interaction.editReply({ content: `Debate created! Head to <#${debatesChannel.id}> to see the discussion.` });
+        postResearch(thread, topic).catch(() => {});
       }
     } catch (err) {
       console.error('[debate create]', err);
@@ -80,3 +83,45 @@ module.exports = {
     }
   },
 };
+
+/**
+ * Fetch research for the topic and post it as a pinned message in the thread.
+ */
+async function postResearch(thread, topic) {
+  const { wiki, news } = await researchTopic(topic);
+
+  if (!wiki && news.length === 0) return; // nothing found, stay quiet
+
+  const embeds = [];
+
+  // Wikipedia embed
+  if (wiki && wiki.summary) {
+    const wikiEmbed = new EmbedBuilder()
+      .setColor(0x6B8EAD)
+      .setTitle(`📖 Wikipedia: ${wiki.title}`)
+      .setDescription(wiki.summary + (wiki.summary.length >= 800 ? '...' : ''))
+      .setURL(wiki.url || null)
+      .setFooter({ text: 'Source: Wikipedia' });
+
+    if (wiki.thumbnail) wikiEmbed.setThumbnail(wiki.thumbnail);
+    embeds.push(wikiEmbed);
+  }
+
+  // News articles embed
+  if (news.length > 0) {
+    const newsLines = news.map(a => `• [${a.title}](${a.url})${a.source ? ` — *${a.source}*` : ''}`).join('\n');
+    const newsEmbed = new EmbedBuilder()
+      .setColor(0xE8A838)
+      .setTitle('📰 Recent News')
+      .setDescription(newsLines)
+      .setFooter({ text: 'Source: Google News' });
+    embeds.push(newsEmbed);
+  }
+
+  const msg = await thread.send({
+    content: '**📚 Research & Background Info** — Get informed before you debate:',
+    embeds,
+  });
+
+  await msg.pin().catch(() => {}); // pin it so it's always easy to find
+}

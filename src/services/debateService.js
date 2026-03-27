@@ -30,6 +30,15 @@ function setDebateThread(debateId, threadId, announceMessageId) {
 }
 
 /**
+ * Look up an active debate by its Discord thread ID.
+ */
+function getDebateByThreadId(threadId) {
+  return db.prepare(`
+    SELECT * FROM debates WHERE thread_id = ? AND status IN ('open', 'voting')
+  `).get(threadId) || null;
+}
+
+/**
  * Get a single debate by ID (and optionally enforce guild).
  */
 function getDebate(debateId, guildId = null) {
@@ -142,6 +151,7 @@ module.exports = {
   createDebate,
   setDebateThread,
   getDebate,
+  getDebateByThreadId,
   listDebates,
   openVoting,
   closeDebate,

@@ -132,20 +132,30 @@ function leaderboardEmbed(rows, guild) {
 /**
  * Profile embed
  */
-function profileEmbed(member, userData) {
-  return new EmbedBuilder()
+function profileEmbed(member, userData, rank = null, bsReceived = 0, bsThrown = 0, flipFlops = 0) {
+  const total = userData.wins + userData.losses + userData.draws;
+  const winRate = total > 0 ? `${Math.round((userData.wins / total) * 100)}%` : 'N/A';
+
+  const embed = new EmbedBuilder()
     .setColor(COLORS.PROFILE)
     .setTitle(`${member.displayName}'s Debate Profile`)
     .setThumbnail(member.user.displayAvatarURL())
     .addFields(
-      { name: 'Points', value: `${userData.points}`, inline: true },
-      { name: 'Wins', value: `${userData.wins}`, inline: true },
-      { name: 'Losses', value: `${userData.losses}`, inline: true },
-      { name: 'Draws', value: `${userData.draws}`, inline: true },
-      { name: 'Debates Participated', value: `${userData.debates_participated}`, inline: true },
-      { name: 'Topics Created', value: `${userData.topics_created}`, inline: true },
+      { name: '⭐ Points', value: `${userData.points}`, inline: true },
+      { name: '🏆 Rank', value: rank !== null ? `#${rank}` : '—', inline: true },
+      { name: '📊 Win Rate', value: winRate, inline: true },
+      { name: '✅ Wins', value: `${userData.wins}`, inline: true },
+      { name: '❌ Losses', value: `${userData.losses}`, inline: true },
+      { name: '🤝 Draws', value: `${userData.draws}`, inline: true },
+      { name: '💬 Debates Joined', value: `${userData.debates_participated}`, inline: true },
+      { name: '📝 Topics Created', value: `${userData.topics_created}`, inline: true },
+      { name: '💩 BS Received', value: `${bsReceived}`, inline: true },
+      { name: '💩 BS Thrown', value: `${bsThrown}`, inline: true },
+      { name: '🔄 Flip-Flop Accusations', value: `${flipFlops}`, inline: true },
     )
     .setTimestamp();
+
+  return embed;
 }
 
 /**
@@ -191,7 +201,7 @@ function bsEmbed(caller, target, debateId) {
     .setColor(COLORS.FUN)
     .setTitle('BS Called!')
     .setDescription(`<@${caller.id}> is calling BS on <@${target.id}>${debateId ? ` in debate #${debateId}` : ''}!`)
-    .setFooter({ text: 'Target can use /bs back to counter!' })
+    .setFooter({ text: 'The community will decide if this argument is BS.' })
     .setTimestamp();
 }
 

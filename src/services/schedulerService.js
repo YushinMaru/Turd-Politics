@@ -1,5 +1,6 @@
 const { getAllOpenVoteMessages, getTally, determineWinner, awardWinnerPoints, notifySubscribers } = require('./voteService');
-const { closeDebate, getDebate } = require('./debateService');
+const { closeDebate, getDebate, getParticipants } = require('./debateService');
+const { syncRolesForUser, getRolesConfig } = require('./reputationService');
 const { votePollEmbed, winnerEmbed } = require('../utils/embeds');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
@@ -96,8 +97,23 @@ async function finalizeVote(client, debateId) {
   await notifySubscribers(
     client,
     debateId,
-    `Debate #${debateId} ("${debate.topic}") has concluded! Check the results in the server.`,
+    `🏁 Debate #${debateId} ("${debate.topic}") has concluded! Check the results in the server.`,
   );
+
+  // Sync roles for all participants based on their updated stats
+  try {
+    const guild = await client.guilds.fetch(debate.guild_id);
+    const rolesConfig = getRolesConfig(debate.guild_id);
+    if (rolesConfig.length > 0) {
+      const participants = getParticipants(debateId);
+      for (const p of participants) {
+        const member = await guild.members.fetch(p.user_id).catch(() => null);
+        if (member) await syncRolesForUser(member, rolesConfig);
+      }
+    }
+  } catch (err) {
+    console.error(`[Scheduler] Role sync error for debate #${debateId}:`, err.message);
+  }
 }
 
 /**
