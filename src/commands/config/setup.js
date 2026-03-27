@@ -13,6 +13,8 @@ module.exports = {
     .addChannelOption(o => o.setName('auditlog').setDescription('Channel for all bot audit logs').addChannelTypes(ChannelType.GuildText).setRequired(true))
     .addIntegerOption(o => o.setName('vote_duration').setDescription('How many hours voting stays open (default: 48)').setMinValue(1).setMaxValue(336))
     .addIntegerOption(o => o.setName('max_topic_length').setDescription('Max character length for debate topics (default: 200)').setMinValue(20).setMaxValue(500))
+    .addIntegerOption(o => o.setName('auto_debate_interval').setDescription('Post a new bot debate every N days (0 = disabled, default: 0)').setMinValue(0).setMaxValue(30))
+    .addIntegerOption(o => o.setName('auto_close_days').setDescription('Auto-move stale user debates to voting after N days (0 = disabled, default: 0)').setMinValue(0).setMaxValue(30))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
   async execute(interaction) {
@@ -27,17 +29,24 @@ module.exports = {
     const voteDuration = interaction.options.getInteger('vote_duration') ?? 48;
     const maxTopicLength = interaction.options.getInteger('max_topic_length') ?? 200;
 
+    // Preserve existing automation values if not provided
+    const existing = db.prepare('SELECT * FROM servers WHERE guild_id = ?').get(interaction.guildId);
+    const autoDebateInterval = interaction.options.getInteger('auto_debate_interval') ?? existing?.auto_debate_interval_days ?? 0;
+    const autoCloseDays = interaction.options.getInteger('auto_close_days') ?? existing?.auto_close_days ?? 0;
+
     db.prepare(`
-      INSERT INTO servers (guild_id, debates_channel_id, results_channel_id, modqueue_channel_id, auditlog_channel_id, vote_duration_hours, max_topic_length)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO servers (guild_id, debates_channel_id, results_channel_id, modqueue_channel_id, auditlog_channel_id, vote_duration_hours, max_topic_length, auto_debate_interval_days, auto_close_days)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(guild_id) DO UPDATE SET
         debates_channel_id = excluded.debates_channel_id,
         results_channel_id = excluded.results_channel_id,
         modqueue_channel_id = excluded.modqueue_channel_id,
         auditlog_channel_id = excluded.auditlog_channel_id,
         vote_duration_hours = excluded.vote_duration_hours,
-        max_topic_length = excluded.max_topic_length
-    `).run(interaction.guildId, debates.id, results.id, modqueue.id, auditlog.id, voteDuration, maxTopicLength);
+        max_topic_length = excluded.max_topic_length,
+        auto_debate_interval_days = excluded.auto_debate_interval_days,
+        auto_close_days = excluded.auto_close_days
+    `).run(interaction.guildId, debates.id, results.id, modqueue.id, auditlog.id, voteDuration, maxTopicLength, autoDebateInterval, autoCloseDays);
 
     const config = db.prepare('SELECT * FROM servers WHERE guild_id = ?').get(interaction.guildId);
     return interaction.reply({ embeds: [configEmbed(config)], ephemeral: false });

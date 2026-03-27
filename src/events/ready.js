@@ -1,4 +1,5 @@
 const { recoverSchedules } = require('../services/schedulerService');
+const { startAutoDebate } = require('../services/autoDebateService');
 
 module.exports = {
   name: 'ready',
@@ -9,6 +10,9 @@ module.exports = {
 
     // Recover any in-progress vote timers that were running before a restart
     await recoverSchedules(client);
+
+    // Start the auto-debate cron job (new topics + stale close)
+    startAutoDebate(client);
 
     client.user.setActivity('political debates | /debate create', { type: 3 }); // Watching
   },

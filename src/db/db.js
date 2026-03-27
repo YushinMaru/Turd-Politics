@@ -20,6 +20,9 @@ function initDB() {
       auditlog_channel_id TEXT,
       vote_duration_hours INTEGER DEFAULT 48,
       max_topic_length INTEGER DEFAULT 200,
+      auto_debate_interval_days INTEGER DEFAULT 0,
+      auto_close_days INTEGER DEFAULT 0,
+      last_bot_debate_at INTEGER DEFAULT 0,
       created_at INTEGER DEFAULT (unixepoch())
     );
 
@@ -34,6 +37,7 @@ function initDB() {
       status TEXT DEFAULT 'open',
       side_a_label TEXT DEFAULT 'For',
       side_b_label TEXT DEFAULT 'Against',
+      is_bot_debate INTEGER DEFAULT 0,
       created_at INTEGER DEFAULT (unixepoch()),
       voting_started_at INTEGER,
       closed_at INTEGER,
@@ -168,6 +172,17 @@ function initDB() {
       created_at INTEGER DEFAULT (unixepoch())
     );
   `);
+
+  // Migrations: add new columns to existing tables if they don't exist yet
+  const migrations = [
+    "ALTER TABLE servers ADD COLUMN auto_debate_interval_days INTEGER DEFAULT 0",
+    "ALTER TABLE servers ADD COLUMN auto_close_days INTEGER DEFAULT 0",
+    "ALTER TABLE servers ADD COLUMN last_bot_debate_at INTEGER DEFAULT 0",
+    "ALTER TABLE debates ADD COLUMN is_bot_debate INTEGER DEFAULT 0",
+  ];
+  for (const sql of migrations) {
+    try { db.exec(sql); } catch {} // Silently skip if column already exists
+  }
 
   console.log('[DB] Database initialized successfully.');
 }

@@ -179,6 +179,13 @@ function podiumEmbed(top3) {
  * Config display embed
  */
 function configEmbed(config) {
+  const autoDebate = config.auto_debate_interval_days > 0
+    ? `Every ${config.auto_debate_interval_days} day(s)`
+    : 'Disabled';
+  const autoClose = config.auto_close_days > 0
+    ? `After ${config.auto_close_days} day(s)`
+    : 'Disabled';
+
   return new EmbedBuilder()
     .setColor(COLORS.INFO)
     .setTitle('Server Config — Turd Politics')
@@ -189,6 +196,8 @@ function configEmbed(config) {
       { name: 'Audit Log Channel', value: config.auditlog_channel_id ? `<#${config.auditlog_channel_id}>` : 'Not set', inline: true },
       { name: 'Vote Duration', value: `${config.vote_duration_hours} hours`, inline: true },
       { name: 'Max Topic Length', value: `${config.max_topic_length} characters`, inline: true },
+      { name: '🤖 Auto-Post Bot Debate', value: autoDebate, inline: true },
+      { name: '⏰ Auto-Close Stale Debates', value: autoClose, inline: true },
     )
     .setTimestamp();
 }
